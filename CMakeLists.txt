@@ -16,6 +16,7 @@ add_compile_definitions(
 # src内的文件夹
 set( SRC_DIRES   
 	 "WinApp"             # 应用窗口	 
+	 "WinGLTF"            # GLTF // 数据解析 
 )
 
 # glad文件
