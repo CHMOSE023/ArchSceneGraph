@@ -33,6 +33,21 @@ public:
         glDeleteProgram(m_programID);
 
     };
+
+    GLuint GetShader() {
+        return m_programID;
+    }
+
+    GLuint GetVAO() 
+    {
+        return m_vao;
+    }
+
+    int GetVertexCount()
+    {
+        return  36;
+    }
+  
 	void Init()
 	{
 

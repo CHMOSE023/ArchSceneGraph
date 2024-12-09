@@ -2,7 +2,7 @@
 #include  "../Shader/Shader.h"
 #include  <map>
 #include <string>
-// 基础关照
+// 基础光照
 class ShaderBasicLighting : public Shader
 {
 public:

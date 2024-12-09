@@ -299,7 +299,7 @@ public:
         return shaderId;
 
     }
-
+ 
 private:
     GLuint m_lightingShader = -1;
     GLuint m_cubeShader = -1;
