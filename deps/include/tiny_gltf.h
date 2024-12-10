@@ -1,3 +1,4 @@
+#pragma once
 //
 // Header-only tiny glTF 2.0 loader and serializer.
 //
