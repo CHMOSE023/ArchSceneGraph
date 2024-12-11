@@ -23,6 +23,7 @@ private:
 	static void  CursorPositionCallback(GLFWwindow* window, double xpos, double ypos);
 	static void  WindowSizeCallback(GLFWwindow* window, int width, int height);
 	static void  ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+	static void  WindowIconifyCallback(GLFWwindow* window, int iconified);
 
 	static Application* GetWindow(GLFWwindow* window);
 	glm::dvec3 CalcIntersectPoint(Ray& ray); // 射线上的目标点
@@ -48,6 +49,8 @@ private:
 				  
 	bool          m_bLeftFlg;	   // 鼠标左键键按下 
 	glm::dvec2    m_leftPosition;  // 鼠标左键按下位置
+
+	 bool         m_isMinimized = false; // 窗口是否最小化
 	
 };
 

@@ -120,10 +120,22 @@ void Application::WindowSizeCallback(GLFWwindow* window, int width, int height)
 {
 	Application* Application = GetWindow(window);
 	Application->m_winHeight = height;
-	Application->m_winWidth = width;
+	Application->m_winWidth  = width;
 
-	Application->m_camera.Perspective(45.0f, float(width) / float(height), 0.1f, 500.0f);
+	if (height == 0) { height = 1;} // 防止除零
+	
+	float aspect = static_cast<float>(width) / static_cast<float>(height);
+
+	Application->m_camera.Perspective(45.0f, aspect, 0.1f, 500.0f);
 	Application->m_camera.SetViewSize(float(width), float(height));
+}
+
+// 窗口最小化
+void Application::WindowIconifyCallback(GLFWwindow* window, int iconified)
+{
+	Application* application = GetWindow(window);
+	application->m_isMinimized = (iconified == GLFW_TRUE);
+	//std::cout << application->m_isMinimized << std::endl;
 }
 
 // 滚轮旋转
@@ -183,6 +195,7 @@ void Application::Initialize(int width, int height, const char* title)
 	glfwSetCursorPosCallback(m_pWindow, CursorPositionCallback);
 	glfwSetWindowSizeCallback(m_pWindow, WindowSizeCallback);
 	glfwSetScrollCallback(m_pWindow, ScrollCallback);
+	glfwSetWindowIconifyCallback(m_pWindow, WindowIconifyCallback);
 
 	glfwMakeContextCurrent(m_pWindow);
 
@@ -215,7 +228,13 @@ void Application::Run()
 	int    framesNumber = 0;  // 
 
 	while (!glfwWindowShouldClose(m_pWindow))
-	{
+	{ 
+		if (m_isMinimized) 
+		{
+			glfwWaitEvents(); // 窗口最小化时，暂停渲染
+			continue;
+		}
+		
 		double   elapseTime = (double)m_timeStamp.GetElapsedSecond();
 		m_elapsedTime += elapseTime;               // 累计用时			
 		curTime += m_timeStamp.GetElapsedSecond(); // 计算帧率
@@ -241,7 +260,12 @@ void Application::Run()
 		Render(); // 2.开始渲染
 
 		glfwSwapBuffers(m_pWindow);
-		glfwPollEvents(); // 检查窗口当前是否有事件发生		
+
+	    glfwWaitEvents();    // 等待事件，没有事件低渲染方式	
+
+		// glfwPollEvents();  // 打开垂直同步时输出60帧率 ，关闭垂直同步 充分渲染
+		// 
+		// std::cout << m_franerNuber << std::endl;
 	}
 	Shutdown();   // 3.结束渲染
 }
