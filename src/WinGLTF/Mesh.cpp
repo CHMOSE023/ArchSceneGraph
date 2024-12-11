@@ -8,9 +8,8 @@ Mesh::Mesh(Shader* shader) : m_Shader(shader), m_VAO(0) , m_NumIndices(0)
 Mesh::~Mesh() 
 {
 	if (m_VAO) glDeleteVertexArrays(1, &m_VAO);	 
-}
- 
-
+} 
+   
 void Mesh::LoadMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh)
 {
     // 1. 创建 VAO
@@ -22,26 +21,61 @@ void Mesh::LoadMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh)
 
     const tinygltf::Primitive& primitive = mesh.primitives[0];
 
+    // 2.0 读取索引位置
+    if (primitive.indices >= 0)
+    {
+        GLuint ebo; // 索引缓冲区对象
+        vbos.push_back(ebo);
+
+        glGenBuffers(1, &ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+
+        const tinygltf::Accessor&   accessor   = model.accessors[primitive.indices];
+        const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
+        const tinygltf::Buffer&     buffer     = model.buffers[bufferView.buffer];
+
+        const void* data = &buffer.data[bufferView.byteOffset + accessor.byteOffset];  // 访问索引数据
+
+        // 根据索引类型进行处理
+        GLenum indexType = GL_UNSIGNED_SHORT; // 默认使用 UNSIGNED_SHORT
+
+        if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) 
+        {
+            indexType = GL_UNSIGNED_BYTE;
+        }
+        else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+        {
+            indexType = GL_UNSIGNED_INT;
+        }
+     
+        // 加载索引数据到 EBO
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, accessor.count * tinygltf::GetComponentSizeInBytes(accessor.componentType), data, GL_STATIC_DRAW);
+       
+        // 保存索引数量和索引类型
+        m_NumIndices = accessor.count;
+        m_IndexType  = indexType; // 新增字段 m_IndexType 保存索引类型
+
+    }
+
     // 2.1 顶点位置（POSITION）
     if (primitive.attributes.find("POSITION") != primitive.attributes.end())
     {
         GLuint vbo;
         glGenBuffers(1, &vbo);
         vbos.push_back(vbo);
-
-        const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("POSITION")];
-        const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-        const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
+        auto indices = primitive.attributes.at("POSITION");
+        const tinygltf::Accessor&    accessor   = model.accessors[indices];
+        const tinygltf::BufferView&  bufferView = model.bufferViews[accessor.bufferView];
+        const tinygltf::Buffer&      buffer     = model.buffers[bufferView.buffer];
+        // buffer 是 url
         const GLfloat* data = reinterpret_cast<const GLfloat*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
 
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, accessor.count * 3 * sizeof(GLfloat), data, GL_STATIC_DRAW);
 
         // 设置顶点属性指针
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-        glEnableVertexAttribArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+        glEnableVertexAttribArray(0); 
     }
 
     // 2.2 法线（NORMAL）
@@ -50,63 +84,17 @@ void Mesh::LoadMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh)
         GLuint vbo;
         glGenBuffers(1, &vbo);
         vbos.push_back(vbo);
-
-        const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("NORMAL")];
+        auto indices = primitive.attributes.at("NORMAL");
+        const tinygltf::Accessor&   accessor   = model.accessors[indices];
         const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-        const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
+        const tinygltf::Buffer&     buffer     = model.buffers[bufferView.buffer];
 
         const GLfloat* data = reinterpret_cast<const GLfloat*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
 
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, accessor.count * 3 * sizeof(GLfloat), data, GL_STATIC_DRAW);
-
-        // 设置顶点属性指针
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+        glBufferData(GL_ARRAY_BUFFER, accessor.count * 3 * sizeof(GLfloat), data, GL_STATIC_DRAW);  
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);   // 设置顶点属性指针
         glEnableVertexAttribArray(1);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-
-    // 2.3 纹理坐标（TEXCOORD_0）
-    if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end())
-    {
-        GLuint vbo;
-        glGenBuffers(1, &vbo);
-        vbos.push_back(vbo);
-
-        const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
-        const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-        const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
-        const GLfloat* data = reinterpret_cast<const GLfloat*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, accessor.count * 2 * sizeof(GLfloat), data, GL_STATIC_DRAW);
-
-        // 设置顶点属性指针
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-        glEnableVertexAttribArray(2);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-
-    // 3. 索引数据（绑定到 EBO）
-    if (primitive.indices >= 0)
-    {
-        GLuint ebo;
-        glGenBuffers(1, &ebo);
-
-        // 绑定 EBO（索引缓冲对象只需要一个）
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-
-        const tinygltf::Accessor& indexAccessor = model.accessors[primitive.indices];
-        const tinygltf::BufferView& indexBufferView = model.bufferViews[indexAccessor.bufferView];
-        const tinygltf::Buffer& indexBuffer = model.buffers[indexBufferView.buffer];
-
-        const GLuint* indexData = reinterpret_cast<const GLuint*>(&indexBuffer.data[indexBufferView.byteOffset + indexAccessor.byteOffset]);
-
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexAccessor.count * sizeof(GLuint), indexData, GL_STATIC_DRAW);
-
-        // 更新索引数量
-        m_NumIndices = indexAccessor.count;
     }
 
     // 4. 解绑 VAO
@@ -156,8 +144,7 @@ void Mesh::Draw(const glm::mat4& globalTransform)
 	}
 	else
 	{
-		glDrawElements(GL_TRIANGLES, m_NumIndices, GL_UNSIGNED_INT, 0);
-		 
+		glDrawElements(GL_TRIANGLES, m_NumIndices, m_IndexType, nullptr);
 	}
 
     glBindVertexArray(0);

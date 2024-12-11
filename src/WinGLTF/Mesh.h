@@ -21,5 +21,6 @@ private:
 	Shader* m_Shader;      // 着色器对象
 	int     m_NumIndices;  // 网格索引数量
 	bool    m_DrawArrays = false;
+	GLenum  m_IndexType;
 
 };

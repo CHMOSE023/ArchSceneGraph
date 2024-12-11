@@ -37,46 +37,67 @@ class WinGLTF:public Application
 
 
 	const char* baseVS = R"(
-				#version 330 core
-				
-				layout(location = 0) in vec3 aPosition;   // 顶点位置
-				layout(location = 1) in vec3 aNormal;     // 顶点法线
-				
-				uniform mat4 mvp;                         // 模型视图投影矩阵
-				uniform mat4 uModelMatrix;                // 模型矩阵（用于节点变换）
-				
-				out vec3 fragNormal;                      // 传递给片段着色器的法线
-				out vec3 fragPosition;                    // 传递给片段着色器的位置
-				
-				void main()
-				{
-				    vec4 worldPosition = uModelMatrix * vec4(aPosition, 1.0);       // 应用模型变换到顶点位置				 
-				    fragPosition = worldPosition.xyz;                               // 将变换后的顶点位置和法线传递给片段着色器
-				    fragNormal = mat3(transpose(inverse(uModelMatrix))) * aNormal;  // 对法线进行变换
-				    gl_Position = mvp * worldPosition;                              // 使用模型视图投影矩阵输出最终变换的位置
-				}
+            #version 330 core
+            layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec3 aNormal;
+            
+            out vec3 FragPos;
+            out vec3 Normal;
+            
+            uniform mat4 model;
+            uniform mat4 view;
+            uniform mat4 projection;
+            
+            void main()
+            {
+                FragPos = vec3(model * vec4(aPos, 1.0));
+                
+                // Normal 法线矩阵  可以从cpu计算好传入。
+                Normal  = mat3(transpose(inverse(model))) * aNormal; // 3×3矩阵，来保证它失去了位移属性以及能够乘以vec3的法向量
+                
+                gl_Position = projection * view * vec4(FragPos, 1.0);
+            }
           )";
 
 
 	const char* basePS = R"(
-				#version 330 core
-				
-				in vec3 fragNormal;             // 从顶点着色器传递的法线
-				in vec3 fragPosition;           // 从顶点着色器传递的位置
-				
-				uniform vec3  uLightPosition;   // 世界空间中的光源位置
-				uniform vec4  uBaseColorFactor; // 基础颜色（来自材质）
-				uniform float uMetallicFactor;  // 金属因子（此材质为 0.0）
-				
-				out vec4 FragColor;	
-			
-				void main()
-				{
-				    vec3 lightDir     = normalize(uLightPosition - fragPosition);  // 简单的漫反射光照模型
-				    float diff        = max(dot(fragNormal, lightDir), 0.0);				  
-				    vec3 diffuseColor = uBaseColorFactor.rgb * diff;               // 应用基础颜色				 
-				    FragColor         = vec4(diffuseColor, uBaseColorFactor.a);    // 输出最终颜色
-				}
+            #version 330 core
+            out vec4 FragColor;
+            
+            in vec3 Normal;  
+            in vec3 FragPos;  
+              
+            uniform vec3 lightPos; 
+            uniform vec3 viewPos; 
+            uniform vec3 lightColor;
+            uniform vec3 objectColor;
+            
+            void main()
+            {
+                // ambient 环境光照 Ambient Lighting
+
+                float ambientStrength = 0.6;
+                vec3  ambient         = ambientStrength * lightColor;               
+
+                // diffuse  漫反射光照 Diffuse Lighting
+
+                vec3  norm     = normalize(Normal);               // 法向量标准化
+                vec3  lightDir = normalize(lightPos - FragPos);   // 标准化 计算向量差
+                float diff     = max(dot(norm, lightDir), 0.0);   // norm和lightDir向量进行点乘 ，两个向量之间的角度越大，漫反射分量就会越小
+                vec3  diffuse  = diff * lightColor;               // ！！！缺少法线矩阵计算 变形后失真
+                
+                // specular 镜面光照(Specular Lighting)
+
+                float specularStrength = 0.5;                    // 镜面强度(Specular Intensity)变量
+
+                vec3  viewDir    = normalize(viewPos - FragPos); // 计算视线方向向量
+                vec3  reflectDir = reflect(-lightDir, norm);     // 法线轴的反射向量
+                float spec       = pow(max(dot(viewDir, reflectDir), 0.0), 50); 
+                vec3  specular   = specularStrength * spec * lightColor;  
+                    
+                vec3 result = (ambient + diffuse + specular) * objectColor;
+                FragColor = vec4(result, 1.0);
+            } 
           )";
 
 
@@ -125,16 +146,26 @@ class WinGLTF:public Application
 
 		pshader = new Shader();
 		pshader->CreateShader(baseVS,basePS);
-		  
+	    pshader->uniform["aPos"]        = glGetAttribLocation(pshader->m_shaderId, "aPos");
+		pshader->uniform["aNormal"]     = glGetAttribLocation(pshader->m_shaderId, "aNormal");
+
+		pshader->uniform["model"]       = glGetUniformLocation(pshader->m_shaderId, "model");
+		pshader->uniform["view"]        = glGetUniformLocation(pshader->m_shaderId, "view");
+		pshader->uniform["projection"]  = glGetUniformLocation(pshader->m_shaderId, "projection");
+
+		pshader->uniform["lightPos"]    = glGetUniformLocation(pshader->m_shaderId, "lightPos");
+		pshader->uniform["viewPos"]     = glGetUniformLocation(pshader->m_shaderId, "viewPos");
+		pshader->uniform["lightColor"]  = glGetUniformLocation(pshader->m_shaderId, "lightColor");
+		pshader->uniform["objectColor"] = glGetUniformLocation(pshader->m_shaderId, "objectColor");  
+
+
 		// 读取网格数据
-		for (size_t i = 0; i < m_model.meshes.size(); i++)
-		{
-			 Mesh* mesh = new  Mesh(pshader);
-			 
-			 mesh->LoadMesh(m_model, m_model.meshes[i]);
-			 
-			 m_sceneNode.AddChild(mesh);
-		}
+
+		Mesh* mesh = new  Mesh(pshader);
+
+		mesh->LoadMesh(m_model, m_model.meshes[0]);
+
+		m_sceneNode.AddChild(mesh);
 		 
 		
 	}
@@ -142,7 +173,7 @@ class WinGLTF:public Application
 	// 2.渲染数据
 	virtual void Render()
 	{
-		m_ground.Render(m_camera);
+		// m_ground.Render(m_camera);
 		 
 		m_sceneNode.Render(m_camera);
 	}
